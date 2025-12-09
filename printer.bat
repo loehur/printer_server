@@ -1,5 +1,5 @@
 @echo off
-cd /d D:\node\printer_server
+cd /d %~dp0
 echo Starting Print Server...
-node server.js
+npm start
 pause
