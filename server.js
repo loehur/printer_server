@@ -1,6 +1,11 @@
 const express = require("express");
 const cors = require("cors");
-const { print, printQRCode, printQRWithText, PORT_NAME } = require("./print-cmd");
+const {
+  print,
+  printQRCode,
+  printQRWithText,
+  PORT_NAME,
+} = require("./print-cmd");
 
 const app = express();
 const PORT = 3000;
@@ -27,7 +32,11 @@ app.post("/print", async (req, res) => {
         });
       }
 
-      console.log(`\n📱 Menerima request QR Code: "${qrData.substring(0, 50)}${qrData.length > 50 ? "..." : ""}"`);
+      console.log(
+        `\n📱 Menerima request QR Code: "${qrData.substring(0, 50)}${
+          qrData.length > 50 ? "..." : ""
+        }"`
+      );
 
       // Print QR Code
       await printQRCode(qrData);
@@ -104,8 +113,15 @@ app.post("/printqr", async (req, res) => {
     }
 
     console.log(`\n📱 Menerima request Print QR:`);
-    console.log(`   QR: ${qr_string.substring(0, 50)}${qr_string.length > 50 ? "..." : ""}`);
-    if (text) console.log(`   Text: ${text.substring(0, 50)}${text.length > 50 ? "..." : ""}`);
+    console.log(
+      `   QR: ${qr_string.substring(0, 50)}${
+        qr_string.length > 50 ? "..." : ""
+      }`
+    );
+    if (text)
+      console.log(
+        `   Text: ${text.substring(0, 50)}${text.length > 50 ? "..." : ""}`
+      );
 
     // Print QR Code + Text
     await printQRWithText(qr_string, text || "");
@@ -153,7 +169,7 @@ app.get("/", (req, res) => {
           qr_only: { qr_string: "https://example.com" },
           qr_with_text: {
             qr_string: "https://example.com",
-            text: "Scan untuk info lebih lanjut"
+            text: "Scan untuk info lebih lanjut",
           },
         },
       },
@@ -183,17 +199,14 @@ app.listen(PORT, () => {
 ╚═══════════════════════════════════════╝
 
 🌐 Server running at: http://localhost:${PORT}
-🖨️  Printer port: ${PORT_NAME}
+🖨️ Printer port: ${PORT_NAME}
 
 📌 Endpoints:
-   GET  /          - Server info
-   GET  /health    - Health check
-   POST /print     - Print text
-
-💡 Contoh penggunaan:
-   curl -X POST http://localhost:${PORT}/print -H "Content-Type: application/json" -d "{\\"text\\":\\"TEST\\"}"
-   curl -X POST http://localhost:${PORT}/print -H "Content-Type: text/plain" -d "TEST"
-
-✨ Server siap menerima request!
+   - GET  /          - Server info
+   - GET  /health    - Health check
+   - POST /print     - Print text
+   - POST /printqr   - Print QR Code with text
+   
+✨ Printer Siap Cetak!
 `);
 });
