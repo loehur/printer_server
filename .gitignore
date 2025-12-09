@@ -1,4 +1,4 @@
 .claude/
 
 # Wrapper script (local only, tidak di-track)
-start.bat
+START.bat
