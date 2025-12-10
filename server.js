@@ -10,6 +10,9 @@ const {
 const app = express();
 const PORT = 3000;
 
+// Helper function untuk membersihkan HTML tags dari log
+const stripHtmlTags = (str) => str.replace(/<[^>]*>/g, '');
+
 // Middleware CORS - Izinkan semua origin
 app.use(cors());
 
@@ -76,7 +79,10 @@ app.post("/print", async (req, res) => {
       });
     }
 
-    console.log(`\n📝 Menerima request print: "${text}"`);
+    // Log tanpa HTML tags agar lebih rapi
+    const cleanText = stripHtmlTags(text);
+    const preview = cleanText.length > 100 ? cleanText.substring(0, 100) + "..." : cleanText;
+    console.log(`\n📝 Menerima request print: "${preview}"`);
 
     // Cetak ke printer
     await print(text);
