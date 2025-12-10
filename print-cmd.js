@@ -4,8 +4,8 @@ const path = require("path");
 
 // ==================== KONFIGURASI ====================
 const PORT_NAME = "COM1";
-const TOP_MARGIN_LINES = 3; // Jumlah baris kosong di awal sebelum print
-const AUTO_FEED_LINES = 4; // Jumlah baris feed otomatis setelah print
+const TOP_MARGIN_LINES = 2; // Jumlah baris kosong di awal sebelum print
+const AUTO_FEED_LINES = 5; // Jumlah baris feed otomatis setelah print
 const LINE_WIDTH = 32; // Lebar baris untuk printer (32 untuk 58mm, 48 untuk 80mm)
 // =====================================================
 
