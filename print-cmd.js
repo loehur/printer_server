@@ -4,7 +4,7 @@ const path = require("path");
 
 // ==================== KONFIGURASI ====================
 const PORT_NAME = "COM1";
-const TOP_MARGIN_LINES = 5; // Jumlah baris kosong di awal sebelum print
+const TOP_MARGIN_LINES = 3; // Jumlah baris kosong di awal sebelum print
 const AUTO_FEED_LINES = 4; // Jumlah baris feed otomatis setelah print
 const LINE_WIDTH = 32; // Lebar baris untuk printer (32 untuk 58mm, 48 untuk 80mm)
 // =====================================================
@@ -25,15 +25,15 @@ function processTdTags(line) {
   }
 
   // Hapus semua tag <td> dari line
-  line = line.replace(tdRegex, '');
+  line = line.replace(tdRegex, "");
 
   if (matches.length === 1) {
     // Hanya 1 kolom, otomatis rata tengah
     // Hapus alignment tags dari dalam td (sudah tidak diperlukan)
     let content = matches[0]
-      .replace(/<\/?center>/gi, '')
-      .replace(/<\/?right>/gi, '')
-      .replace(/<\/?left>/gi, '');
+      .replace(/<\/?center>/gi, "")
+      .replace(/<\/?right>/gi, "")
+      .replace(/<\/?left>/gi, "");
 
     // Tambahkan center align command
     const ESC = "\x1B";
@@ -44,21 +44,21 @@ function processTdTags(line) {
     // 2+ kolom: kolom pertama di kiri, kolom kedua di kanan, sisanya diabaikan
     // Hapus alignment tags dari dalam td karena posisi sudah diatur oleh spacing
     let col1 = matches[0]
-      .replace(/<\/?center>/gi, '')
-      .replace(/<\/?right>/gi, '')
-      .replace(/<\/?left>/gi, '');
+      .replace(/<\/?center>/gi, "")
+      .replace(/<\/?right>/gi, "")
+      .replace(/<\/?left>/gi, "");
     let col2 = matches[1]
-      .replace(/<\/?center>/gi, '')
-      .replace(/<\/?right>/gi, '')
-      .replace(/<\/?left>/gi, '');
+      .replace(/<\/?center>/gi, "")
+      .replace(/<\/?right>/gi, "")
+      .replace(/<\/?left>/gi, "");
 
     // Hitung panjang text TANPA semua tag HTML untuk spacing yang akurat
-    const actualCol1Length = col1.replace(/<[^>]*>/g, '').length;
-    const actualCol2Length = col2.replace(/<[^>]*>/g, '').length;
+    const actualCol1Length = col1.replace(/<[^>]*>/g, "").length;
+    const actualCol2Length = col2.replace(/<[^>]*>/g, "").length;
     const totalContentLength = actualCol1Length + actualCol2Length;
     const spacing = Math.max(1, LINE_WIDTH - totalContentLength);
 
-    return col1 + ' '.repeat(spacing) + col2 + line;
+    return col1 + " ".repeat(spacing) + col2 + line;
   }
 
   return line;
@@ -86,17 +86,26 @@ function print(text) {
       const rightAlign = ESC + "\x61\x02"; // Right align
       const leftAlign = ESC + "\x61\x00"; // Left align (reset)
 
-      // Proses tag <td> per baris untuk membuat kolom
-      let lines = text.split('\n');
-      lines = lines.map(line => processTdTags(line));
-      text = lines.join('\n');
-
-      // Proses tag alignment dulu (sebelum newline conversion)
-      // Tag alignment tidak wajib ditutup - closing tag akan dihapus jika ada
+      // STEP 1: Konversi <tr> ke newline dulu (tapi JANGAN <br> dulu!)
       let processedText = text
-        .replace(/<\/center>/gi, '') // Hapus closing tag (diabaikan)
-        .replace(/<\/right>/gi, '') // Hapus closing tag (diabaikan)
-        .replace(/<\/left>/gi, '') // Hapus closing tag (diabaikan)
+        .replace(/<tr>/gi, "\n") // Opening <tr> = newline (mulai baris)
+        .replace(/<\/tr>/gi, ""); // Closing </tr> = hapus (agar tidak double newline)
+
+      // STEP 2: Proses tag <td> per baris untuk membuat kolom
+      // (saat ini <td>...</td> masih utuh meski ada <br> di dalamnya)
+      let lines = processedText.split("\n");
+      lines = lines.map((line) => processTdTags(line));
+      processedText = lines.join("\n");
+
+      // STEP 3: Sekarang baru konversi <br> ke newline
+      processedText = processedText.replace(/<br\s*\/?>/gi, "\n"); // Ganti <br> atau <br/> dengan newline
+
+      // STEP 4: Proses tag formatting lainnya
+      // Tag alignment tidak wajib ditutup - closing tag akan dihapus jika ada
+      processedText = processedText
+        .replace(/<\/center>/gi, "") // Hapus closing tag (diabaikan)
+        .replace(/<\/right>/gi, "") // Hapus closing tag (diabaikan)
+        .replace(/<\/left>/gi, "") // Hapus closing tag (diabaikan)
         .replace(/<center>/gi, centerAlign) // Ganti <center> dengan center align
         .replace(/<right>/gi, rightAlign) // Ganti <right> dengan right align
         .replace(/<left>/gi, leftAlign) // Ganti <left> dengan left align
