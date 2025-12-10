@@ -5,8 +5,10 @@ const path = require("path");
 // ==================== KONFIGURASI ====================
 const PORT_NAME = "COM1";
 const TOP_MARGIN_LINES = 2; // Jumlah baris kosong di awal sebelum print
-const AUTO_FEED_LINES = 5; // Jumlah baris feed otomatis setelah print
+const AUTO_FEED_LINES = 7; // Jumlah baris feed otomatis setelah print
 const LINE_WIDTH = 32; // Lebar baris untuk printer (32 untuk 58mm, 48 untuk 80mm)
+const PRINT_TIMEOUT = 10000; // Timeout untuk operasi print dalam milliseconds (10 detik)
+const LINE_SPACING = 35; // Line spacing dalam unit 1/180 inch (default: 30, lebih besar = lebih renggang)
 // =====================================================
 
 // Fungsi helper untuk memproses tag <td> menjadi kolom
@@ -64,6 +66,32 @@ function processTdTags(line) {
   return line;
 }
 
+// Helper function untuk exec dengan timeout
+function execWithTimeout(command, timeout) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(
+        new Error(
+          `Timeout: Operasi print melebihi ${
+            timeout / 1000
+          } detik. COM port mungkin tidak ready atau sedang sibuk.`
+        )
+      );
+    }, timeout);
+
+    exec(command, (error, stdout, stderr) => {
+      clearTimeout(timeoutId);
+
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
 // Fungsi untuk mencetak menggunakan CMD type (terbukti berhasil!)
 function print(text) {
   return new Promise((resolve, reject) => {
@@ -85,6 +113,7 @@ function print(text) {
       const centerAlign = ESC + "\x61\x01"; // Center align
       const rightAlign = ESC + "\x61\x02"; // Right align
       const leftAlign = ESC + "\x61\x00"; // Left align (reset)
+      const setLineSpacing = ESC + "\x33" + String.fromCharCode(LINE_SPACING); // Set custom line spacing
 
       // STEP 1: Konversi <tr> ke newline dulu (tapi JANGAN <br> dulu!)
       let processedText = text
@@ -120,38 +149,49 @@ function print(text) {
       // Buat temp file
       const tempFile = path.join(__dirname, "temp_print.txt");
 
-      // Tulis text ke temp file dengan margin atas, CRLF + auto feed di akhir
+      // Tulis text ke temp file dengan line spacing, margin atas, CRLF + auto feed di akhir
       processedText = processedText.replace(/\n/g, "\r\n");
       const feedLines = "\r\n".repeat(AUTO_FEED_LINES);
-      fs.writeFileSync(tempFile, topMargin + processedText + feedLines, {
-        encoding: "binary",
-      });
+      fs.writeFileSync(
+        tempFile,
+        setLineSpacing + topMargin + processedText + feedLines,
+        {
+          encoding: "binary",
+        }
+      );
 
       // Copy file ke COM port menggunakan CMD
       const command = `type "${tempFile}" > ${PORT_NAME}`;
 
       console.log(`📄 Mencetak ${text.split("\n").length} baris...`);
       console.log(`   Menjalankan: ${command}`);
+      console.log(`   Timeout: ${PRINT_TIMEOUT / 1000} detik`);
 
-      exec(command, (error, stdout, stderr) => {
-        // Hapus temp file
-        try {
-          fs.unlinkSync(tempFile);
-        } catch (e) {
-          // Ignore error saat delete temp file
-        }
+      execWithTimeout(command, PRINT_TIMEOUT)
+        .then(() => {
+          // Hapus temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {
+            // Ignore error saat delete temp file
+          }
 
-        if (error) {
-          console.error("Error:", error.message);
+          console.log(
+            `✓ Data terkirim ke ${PORT_NAME} (+ ${AUTO_FEED_LINES} line feed)`
+          );
+          resolve();
+        })
+        .catch((error) => {
+          // Hapus temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {
+            // Ignore error saat delete temp file
+          }
+
+          console.error("❌ Error:", error.message);
           reject(error);
-          return;
-        }
-
-        console.log(
-          `✓ Data terkirim ke ${PORT_NAME} (+ ${AUTO_FEED_LINES} line feed)`
-        );
-        resolve();
-      });
+        });
     } catch (error) {
       console.error("Error:", error.message);
       reject(error);
@@ -217,24 +257,31 @@ async function printQRCode(data) {
       const command = `type "${tempFile}" > ${PORT_NAME}`;
 
       console.log(`   Menjalankan ESC/POS QR Code command...`);
+      console.log(`   Timeout: ${PRINT_TIMEOUT / 1000} detik`);
 
-      exec(command, (error, stdout, stderr) => {
-        // Hapus temp file
-        try {
-          fs.unlinkSync(tempFile);
-        } catch (e) {
-          // Ignore error
-        }
+      execWithTimeout(command, PRINT_TIMEOUT)
+        .then(() => {
+          // Hapus temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {
+            // Ignore error
+          }
 
-        if (error) {
-          console.error("Error:", error.message);
+          console.log(`✓ QR Code terkirim ke ${PORT_NAME}`);
+          resolve({ success: true });
+        })
+        .catch((error) => {
+          // Hapus temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {
+            // Ignore error
+          }
+
+          console.error("❌ Error:", error.message);
           reject(error);
-          return;
-        }
-
-        console.log(`✓ QR Code terkirim ke ${PORT_NAME}`);
-        resolve({ success: true });
-      });
+        });
     } catch (error) {
       console.error("Error generating QR code:", error.message);
       reject(error);
@@ -251,6 +298,7 @@ async function printQRWithText(qrData, text = "") {
       // ESC/POS QR Code Commands
       const ESC = "\x1B";
       const GS = "\x1D";
+      const setLineSpacing = ESC + "\x33" + String.fromCharCode(LINE_SPACING); // Set custom line spacing
 
       // QR Code Model (Model 2)
       const qrModel = GS + "(k" + String.fromCharCode(4, 0, 49, 65, 50, 0);
@@ -275,6 +323,7 @@ async function printQRWithText(qrData, text = "") {
       let commands =
         ESC +
         "@" + // Initialize
+        setLineSpacing + // Set line spacing
         ESC +
         "a" +
         "\x01" + // Center align
@@ -304,24 +353,31 @@ async function printQRWithText(qrData, text = "") {
 
       console.log(`   QR: ${qrData.substring(0, 30)}...`);
       if (text) console.log(`   Text: ${text.substring(0, 50)}...`);
+      console.log(`   Timeout: ${PRINT_TIMEOUT / 1000} detik`);
 
-      exec(command, (error, stdout, stderr) => {
-        // Hapus temp file
-        try {
-          fs.unlinkSync(tempFile);
-        } catch (e) {
-          // Ignore
-        }
+      execWithTimeout(command, PRINT_TIMEOUT)
+        .then(() => {
+          // Hapus temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {
+            // Ignore
+          }
 
-        if (error) {
-          console.error("Error:", error.message);
+          console.log(`✓ QR Code + Text terkirim ke ${PORT_NAME}`);
+          resolve({ success: true });
+        })
+        .catch((error) => {
+          // Hapus temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {
+            // Ignore
+          }
+
+          console.error("❌ Error:", error.message);
           reject(error);
-          return;
-        }
-
-        console.log(`✓ QR Code + Text terkirim ke ${PORT_NAME}`);
-        resolve({ success: true });
-      });
+        });
     } catch (error) {
       console.error("Error:", error.message);
       reject(error);
