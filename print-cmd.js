@@ -94,7 +94,6 @@ function print(text) {
       // Proses tag alignment dulu (sebelum newline conversion)
       // Tag alignment tidak wajib ditutup - closing tag akan dihapus jika ada
       let processedText = text
-        .replace(/<br\s*\/?>/gi, '\n') // Ganti <br> atau <br/> dengan newline
         .replace(/<\/center>/gi, '') // Hapus closing tag (diabaikan)
         .replace(/<\/right>/gi, '') // Hapus closing tag (diabaikan)
         .replace(/<\/left>/gi, '') // Hapus closing tag (diabaikan)
