@@ -74,8 +74,7 @@ function execWithTimeout(command, timeout) {
     const timeoutId = setTimeout(() => {
       reject(
         new Error(
-          `Timeout: Operasi print melebihi ${
-            timeout / 1000
+          `Timeout: Operasi print melebihi ${timeout / 1000
           } detik. COM port mungkin tidak ready atau sedang sibuk.`
         )
       );
@@ -131,6 +130,9 @@ function print(text, margin_top = 0, feed_lines = 0) {
       // STEP 3: Sekarang baru konversi <br> ke newline
       processedText = processedText.replace(/<br\s*\/?>/gi, "\n"); // Ganti <br> atau <br/> dengan newline
 
+      // STEP 3.5: Hapus leading newlines yang tidak perlu (dari <tr> pertama)
+      processedText = processedText.replace(/^\n+/, "");
+
       // STEP 4: Proses tag formatting lainnya
       // Tag alignment tidak wajib ditutup - closing tag akan dihapus jika ada
       processedText = processedText
@@ -148,26 +150,29 @@ function print(text, margin_top = 0, feed_lines = 0) {
       // Tambahkan baris kosong di awal sesuai parameter
       const topMargin = "\r\n".repeat(margin_top);
 
+      // ESC d n = Print and feed n lines (flush buffer)
+      // Ini memastikan semua data di buffer printer tercetak
+      const flushBuffer = ESC + "\x64\x03"; // Feed 3 lines untuk flush
+
       // Buat temp file
       const tempFile = path.join(__dirname, "temp_print.txt");
 
-      // Tulis text ke temp file dengan line spacing, margin atas, CRLF + auto feed di akhir
+      // Tulis text ke temp file dengan line spacing, margin atas, CRLF + flush di akhir
       processedText = processedText.replace(/\n/g, "\r\n");
       const bottomFeed = "\r\n".repeat(feed_lines);
       fs.writeFileSync(
         tempFile,
-        setLineSpacing + topMargin + processedText + bottomFeed,
+        setLineSpacing + topMargin + processedText + bottomFeed + flushBuffer,
         {
           encoding: "binary",
         }
       );
 
-      // Copy file ke COM port menggunakan CMD
-      const command = `type "${tempFile}" > ${PORT_NAME}`;
+      // Copy file ke COM port menggunakan CMD (copy /b lebih reliable untuk binary)
+      const command = `copy /b "${tempFile}" ${PORT_NAME}`;
 
       console.log(`📄 Mencetak ${text.split("\n").length} baris...`);
       console.log(`   Menjalankan: ${command}`);
-      console.log(`   Timeout: ${PRINT_TIMEOUT / 1000} detik`);
 
       execWithTimeout(command, PRINT_TIMEOUT)
         .then(() => {
@@ -206,8 +211,7 @@ async function printQRCode(data) {
   return new Promise((resolve, reject) => {
     try {
       console.log(
-        `📱 Generating QR Code untuk: ${data.substring(0, 50)}${
-          data.length > 50 ? "..." : ""
+        `📱 Generating QR Code untuk: ${data.substring(0, 50)}${data.length > 50 ? "..." : ""
         }`
       );
       console.log(`   Panjang data: ${data.length} karakter`);
@@ -347,13 +351,16 @@ async function printQRWithText(
       // Print QR Code
       const qrPrint = GS + "(k" + String.fromCharCode(3, 0, 49, 81, 48);
 
-      // Build commands dengan margin dan feed yang dinamis
-      const topMargin = "\n".repeat(margin_top);
-      const bottomFeed = "\n".repeat(feed_lines);
+      // Build commands dengan margin dan feed yang dinamis (konsisten dengan print)
+      const topMargin = "\r\n".repeat(margin_top);
+      const bottomFeed = "\r\n".repeat(feed_lines);
+      const setLineSpacing = ESC + "\x33" + String.fromCharCode(LINE_SPACING); // Set custom line spacing
+      const flushBuffer = ESC + "\x64\x03"; // Feed 3 lines untuk flush
 
       let commands =
         ESC +
         "@" + // Initialize
+        setLineSpacing + // Set line spacing (sama dengan print)
         topMargin + // Margin atas
         ESC +
         "a" +
@@ -363,15 +370,15 @@ async function printQRWithText(
         qrErrorLevel +
         qrStore +
         qrPrint +
-        "\n\n"; // Feed 2 lines setelah QR
+        "\r\n\r\n"; // Feed 2 lines setelah QR (pakai CRLF)
 
-      // Tambahkan text jika ada (gunakan \n saja, bukan \r\n)
+      // Tambahkan text jika ada (gunakan \r\n untuk konsistensi)
       if (text && text.trim() !== "") {
-        commands += text + "\n"; // Tidak perlu replace, pakai \n langsung
+        commands += text + "\r\n";
       }
 
-      // Feed lines dan reset alignment
-      commands += bottomFeed + ESC + "a" + "\x00"; // Reset to left align
+      // Feed lines, reset alignment, dan flush buffer
+      commands += bottomFeed + flushBuffer + ESC + "a" + "\x00"; // Reset to left align
 
       // Buat temp file
       const tempFile = path.join(__dirname, "temp_qr.bin");
