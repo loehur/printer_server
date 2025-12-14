@@ -5,14 +5,12 @@ const QRCode = require("qrcode");
 
 // ==================== KONFIGURASI ====================
 const PORT_NAME = "COM1";
-const TOP_MARGIN_LINES = 0; // Jumlah baris kosong di awal sebelum print
-const AUTO_FEED_LINES = 0; // Jumlah baris feed otomatis setelah print
 const LINE_WIDTH = 32; // Lebar baris untuk printer (32 untuk 58mm, 48 untuk 80mm)
 const PRINT_TIMEOUT = 10000; // Timeout untuk operasi print dalam milliseconds (10 detik)
 const LINE_SPACING = 34; // Line spacing dalam unit 1/180 inch (default: 30, lebih besar = lebih renggang)
 const MAX_QR_LENGTH = 300; // LIMIT HARDWARE: Maksimal 206 karakter (Size 6, Error L)
 const QR_SIZE = 6; // QR Code size 6 (1-16, semakin besar semakin besar ukurannya)
-const QR_ERROR_LEVEL = 48; // Error correction: L=Low 7% (untuk kapasitas maksimal)
+const QR_ERROR_LEVEL = 48; // 48 = Level L (Low), 49 = M, 50 = Q, 51 = H
 // =====================================================
 
 // Fungsi helper untuk memproses tag <td> menjadi kolom
@@ -97,7 +95,7 @@ function execWithTimeout(command, timeout) {
 }
 
 // Fungsi untuk mencetak menggunakan CMD type (terbukti berhasil!)
-function print(text) {
+function print(text, margin_top = 0, feed_lines = 0) {
   return new Promise((resolve, reject) => {
     try {
       // Konversi tag HTML menjadi ESC/POS commands
@@ -147,18 +145,18 @@ function print(text) {
         .replace(/<h1>/gi, h1On) // Ganti <h1> dengan double size on
         .replace(/<\/h1>/gi, h1Off); // Ganti </h1> dengan size reset
 
-      // Tambahkan baris kosong di awal sesuai konfigurasi
-      const topMargin = "\r\n".repeat(TOP_MARGIN_LINES);
+      // Tambahkan baris kosong di awal sesuai parameter
+      const topMargin = "\r\n".repeat(margin_top);
 
       // Buat temp file
       const tempFile = path.join(__dirname, "temp_print.txt");
 
       // Tulis text ke temp file dengan line spacing, margin atas, CRLF + auto feed di akhir
       processedText = processedText.replace(/\n/g, "\r\n");
-      const feedLines = "\r\n".repeat(AUTO_FEED_LINES);
+      const bottomFeed = "\r\n".repeat(feed_lines);
       fs.writeFileSync(
         tempFile,
-        setLineSpacing + topMargin + processedText + feedLines,
+        setLineSpacing + topMargin + processedText + bottomFeed,
         {
           encoding: "binary",
         }
@@ -305,7 +303,12 @@ async function printQRCode(data) {
 }
 
 // Fungsi untuk print QR Code dengan text di bawahnya
-async function printQRWithText(qrData, text = "") {
+async function printQRWithText(
+  qrData,
+  text = "",
+  margin_top = 0,
+  feed_lines = 0
+) {
   return new Promise((resolve, reject) => {
     try {
       console.log(`📱 Generating QR Code dengan text...`);
@@ -344,10 +347,14 @@ async function printQRWithText(qrData, text = "") {
       // Print QR Code
       const qrPrint = GS + "(k" + String.fromCharCode(3, 0, 49, 81, 48);
 
-      // Build commands (sama seperti testQRCapability yang berhasil)
+      // Build commands dengan margin dan feed yang dinamis
+      const topMargin = "\n".repeat(margin_top);
+      const bottomFeed = "\n".repeat(feed_lines);
+
       let commands =
         ESC +
         "@" + // Initialize
+        topMargin + // Margin atas
         ESC +
         "a" +
         "\x01" + // Center align
@@ -364,7 +371,7 @@ async function printQRWithText(qrData, text = "") {
       }
 
       // Feed lines dan reset alignment
-      commands += "\n\n" + ESC + "a" + "\x00"; // Reset to left align
+      commands += bottomFeed + ESC + "a" + "\x00"; // Reset to left align
 
       // Buat temp file
       const tempFile = path.join(__dirname, "temp_qr.bin");

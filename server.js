@@ -99,8 +99,12 @@ app.post("/print", async (req, res) => {
       cleanText.length > 100 ? cleanText.substring(0, 100) + "..." : cleanText;
     console.log(`\n📝 Menerima request print: "${preview}"`);
 
-    // Cetak ke printer
-    await print(text);
+    // Ambil parameter margin dan feed (default 0)
+    const margin_top = parseInt(req.body.margin_top) || 0;
+    const feed_lines = parseInt(req.body.feed_lines) || 0;
+
+    // Cetak ke printer dengan margin dan feed
+    await print(text, margin_top, feed_lines);
 
     res.json({
       success: true,
@@ -108,6 +112,8 @@ app.post("/print", async (req, res) => {
       data: {
         type: "text",
         text: text,
+        margin_top: margin_top,
+        feed_lines: feed_lines,
         port: PORT_NAME,
       },
     });
@@ -144,8 +150,12 @@ app.post("/printqr", async (req, res) => {
         `   Text: ${text.substring(0, 50)}${text.length > 50 ? "..." : ""}`
       );
 
-    // Print QR Code + Text
-    await printQRWithText(qr_string, text || "");
+    // Ambil parameter margin dan feed (default 0)
+    const margin_top = parseInt(req.body.margin_top) || 0;
+    const feed_lines = parseInt(req.body.feed_lines) || 0;
+
+    // Print QR Code + Text dengan margin dan feed
+    await printQRWithText(qr_string, text || "", margin_top, feed_lines);
 
     res.json({
       success: true,
@@ -153,6 +163,8 @@ app.post("/printqr", async (req, res) => {
       data: {
         qr_string: qr_string,
         text: text || "",
+        margin_top: margin_top,
+        feed_lines: feed_lines,
         port: PORT_NAME,
       },
     });
