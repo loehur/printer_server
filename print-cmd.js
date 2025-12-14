@@ -179,7 +179,7 @@ function print(text, margin_top = 0, feed_lines = 0) {
           }
 
           console.log(
-            `✓ Data terkirim ke ${PORT_NAME} (+ ${AUTO_FEED_LINES} line feed)`
+            `✓ Data terkirim ke ${PORT_NAME} (margin: ${margin_top}, feed: ${feed_lines})`
           );
           resolve();
         })
