@@ -5,13 +5,13 @@ const QRCode = require("qrcode");
 
 // ==================== KONFIGURASI ====================
 const PORT_NAME = "COM1";
-const TOP_MARGIN_LINES = 1; // Jumlah baris kosong di awal sebelum print
-const AUTO_FEED_LINES = 5; // Jumlah baris feed otomatis setelah print
+const TOP_MARGIN_LINES = 0; // Jumlah baris kosong di awal sebelum print
+const AUTO_FEED_LINES = 0; // Jumlah baris feed otomatis setelah print
 const LINE_WIDTH = 32; // Lebar baris untuk printer (32 untuk 58mm, 48 untuk 80mm)
 const PRINT_TIMEOUT = 10000; // Timeout untuk operasi print dalam milliseconds (10 detik)
 const LINE_SPACING = 34; // Line spacing dalam unit 1/180 inch (default: 30, lebih besar = lebih renggang)
 const MAX_QR_LENGTH = 300; // LIMIT HARDWARE: Maksimal 206 karakter (Size 6, Error L)
-const QR_SIZE = 6; // QR Code size 6 (optimal untuk 58mm)
+const QR_SIZE = 6; // QR Code size 6 (1-16, semakin besar semakin besar ukurannya)
 const QR_ERROR_LEVEL = 48; // Error correction: L=Low 7% (untuk kapasitas maksimal)
 // =====================================================
 
