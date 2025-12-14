@@ -4,7 +4,6 @@ const {
   print,
   printQRCode,
   printQRWithText,
-  testQRCapability,
   PORT_NAME,
 } = require("./print-cmd");
 
@@ -195,30 +194,6 @@ app.get("/", (req, res) => {
           },
         },
       },
-      testqr: {
-        method: "POST",
-        path: "/test-qr",
-        description: "Test apakah printer support QR code (diagnostic)",
-        note: "Akan mencetak QR code test sederhana untuk diagnose capability",
-      },
-      testprintqr: {
-        method: "GET",
-        path: "/test-printqr",
-        description: "Test print QR code dengan GET (browser-friendly)",
-        examples: {
-          short: "GET /test-printqr?data=TEST",
-          with_text: "GET /test-printqr?data=TEST&text=Hello",
-        },
-      },
-      testqris: {
-        method: "GET",
-        path: "/test-qris",
-        description: "Test print QRIS panjang >140 karakter (mode: image)",
-        note: "Untuk QRIS yang melebihi batas 140 karakter native QR",
-        examples: {
-          qris: "GET /test-qris?data=YOUR_LONG_QRIS_232_CHARS&text=Scan untuk bayar",
-        },
-      },
       health: {
         method: "GET",
         path: "/health",
@@ -237,36 +212,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Endpoint POST /test-qr - Test QR Code capability
-app.post("/test-qr", async (req, res) => {
-  try {
-    console.log("\n🔍 Test QR Code capability diminta...");
-
-    const result = await testQRCapability();
-
-    res.json({
-      success: true,
-      message: result.message,
-      instructions: {
-        step1: "Cek printer Anda",
-        step2:
-          "Jika QR code muncul dengan text 'QR Test: TEST' = Printer SUPPORT QR ✓",
-        step3:
-          "Jika hanya muncul text 'QR Test: TEST' tanpa QR = Printer NOT SUPPORT QR ✗",
-      },
-      testData: result.testData,
-      port: PORT_NAME,
-    });
-  } catch (error) {
-    console.error("❌ Error test QR:", error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Endpoint GET /test-printqr - Test print QR dengan parameter mudah
 // Start server
 app.listen(PORT, async () => {
   console.log(`
@@ -278,9 +223,8 @@ app.listen(PORT, async () => {
    - GET  /health    - Health check
    - POST /print     - Print text
    - POST /printqr   - Print QR Code with text
-   - POST /test-qr   - Test QR capability 🔍
 
-⌨️  Keyboard Shortcuts:
+⌨️ Keyboard Shortcuts:
    - Tekan 't' + Enter = Test Print
    - Tekan 'q' + Enter = Test QR Print (dengan input panjang karakter)
    - Tekan 'x' + Enter = Exit Server
