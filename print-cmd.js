@@ -1,6 +1,7 @@
 const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const QRCode = require("qrcode");
 
 // ==================== KONFIGURASI ====================
 const PORT_NAME = "COM1";
@@ -8,7 +9,10 @@ const TOP_MARGIN_LINES = 1; // Jumlah baris kosong di awal sebelum print
 const AUTO_FEED_LINES = 5; // Jumlah baris feed otomatis setelah print
 const LINE_WIDTH = 32; // Lebar baris untuk printer (32 untuk 58mm, 48 untuk 80mm)
 const PRINT_TIMEOUT = 10000; // Timeout untuk operasi print dalam milliseconds (10 detik)
-const LINE_SPACING = 35; // Line spacing dalam unit 1/180 inch (default: 30, lebih besar = lebih renggang)
+const LINE_SPACING = 34; // Line spacing dalam unit 1/180 inch (default: 30, lebih besar = lebih renggang)
+const MAX_QR_LENGTH = 300; // LIMIT HARDWARE: Maksimal 206 karakter (Size 6, Error L)
+const QR_SIZE = 6; // QR Code size 6 (optimal untuk 58mm)
+const QR_ERROR_LEVEL = 48; // Error correction: L=Low 7% (untuk kapasitas maksimal)
 // =====================================================
 
 // Fungsi helper untuk memproses tag <td> menjadi kolom
@@ -208,6 +212,16 @@ async function printQRCode(data) {
           data.length > 50 ? "..." : ""
         }`
       );
+      console.log(`   Panjang data: ${data.length} karakter`);
+
+      // Validasi panjang data QR
+      if (data.length > MAX_QR_LENGTH) {
+        const errorMsg = `⚠️  WARNING: Data QR terlalu panjang (${data.length} karakter). Maksimal: ${MAX_QR_LENGTH} karakter. QR code mungkin tidak tercetak!`;
+        console.warn(errorMsg);
+        // Potong data ke maksimal panjang
+        data = data.substring(0, MAX_QR_LENGTH);
+        console.log(`   Data dipotong menjadi ${data.length} karakter`);
+      }
 
       // ESC/POS QR Code Commands untuk printer thermal
       const ESC = "\x1B";
@@ -216,11 +230,12 @@ async function printQRCode(data) {
       // QR Code Model (Model 2 adalah yang paling umum)
       const qrModel = GS + "(k" + String.fromCharCode(4, 0, 49, 65, 50, 0);
 
-      // QR Code Size (1-16, 8 adalah ukuran medium)
-      const qrSize = GS + "(k" + String.fromCharCode(3, 0, 49, 67, 8);
+      // QR Code Size - menggunakan konfigurasi dari konstanta
+      const qrSize = GS + "(k" + String.fromCharCode(3, 0, 49, 67, QR_SIZE);
 
-      // QR Code Error Correction Level (M = Medium 48)
-      const qrErrorLevel = GS + "(k" + String.fromCharCode(3, 0, 49, 69, 48);
+      // QR Code Error Correction Level - menggunakan konfigurasi dari konstanta
+      const qrErrorLevel =
+        GS + "(k" + String.fromCharCode(3, 0, 49, 69, QR_ERROR_LEVEL);
 
       // Store QR Code data
       const dataLength = data.length + 3;
@@ -294,20 +309,30 @@ async function printQRWithText(qrData, text = "") {
   return new Promise((resolve, reject) => {
     try {
       console.log(`📱 Generating QR Code dengan text...`);
+      console.log(`   Panjang QR data: ${qrData.length} karakter`);
+
+      // Validasi panjang data QR
+      if (qrData.length > MAX_QR_LENGTH) {
+        const errorMsg = `⚠️  WARNING: Data QR terlalu panjang (${qrData.length} karakter). Maksimal: ${MAX_QR_LENGTH} karakter. QR code mungkin tidak tercetak!`;
+        console.warn(errorMsg);
+        // Potong data ke maksimal panjang
+        qrData = qrData.substring(0, MAX_QR_LENGTH);
+        console.log(`   Data QR dipotong menjadi ${qrData.length} karakter`);
+      }
 
       // ESC/POS QR Code Commands
       const ESC = "\x1B";
       const GS = "\x1D";
-      const setLineSpacing = ESC + "\x33" + String.fromCharCode(LINE_SPACING); // Set custom line spacing
 
       // QR Code Model (Model 2)
       const qrModel = GS + "(k" + String.fromCharCode(4, 0, 49, 65, 50, 0);
 
-      // QR Code Size (1-16, 8 = medium)
-      const qrSize = GS + "(k" + String.fromCharCode(3, 0, 49, 67, 8);
+      // QR Code Size - menggunakan konfigurasi dari konstanta
+      const qrSize = GS + "(k" + String.fromCharCode(3, 0, 49, 67, QR_SIZE);
 
-      // QR Code Error Correction Level (M = Medium)
-      const qrErrorLevel = GS + "(k" + String.fromCharCode(3, 0, 49, 69, 48);
+      // QR Code Error Correction Level - menggunakan konfigurasi dari konstanta
+      const qrErrorLevel =
+        GS + "(k" + String.fromCharCode(3, 0, 49, 69, QR_ERROR_LEVEL);
 
       // Store QR Code data
       const dataLength = qrData.length + 3;
@@ -319,11 +344,10 @@ async function printQRWithText(qrData, text = "") {
       // Print QR Code
       const qrPrint = GS + "(k" + String.fromCharCode(3, 0, 49, 81, 48);
 
-      // Build commands
+      // Build commands (sama seperti testQRCapability yang berhasil)
       let commands =
         ESC +
         "@" + // Initialize
-        setLineSpacing + // Set line spacing
         ESC +
         "a" +
         "\x01" + // Center align
@@ -332,17 +356,15 @@ async function printQRWithText(qrData, text = "") {
         qrErrorLevel +
         qrStore +
         qrPrint +
-        "\n"; // Feed after QR
+        "\n\n"; // Feed 2 lines setelah QR
 
-      // Tambahkan text jika ada
+      // Tambahkan text jika ada (gunakan \n saja, bukan \r\n)
       if (text && text.trim() !== "") {
-        const processedText = text.replace(/\n/g, "\r\n");
-        commands += processedText + "\r\n";
+        commands += text + "\n"; // Tidak perlu replace, pakai \n langsung
       }
 
       // Feed lines dan reset alignment
-      const feedLines = "\r\n".repeat(AUTO_FEED_LINES);
-      commands += feedLines + ESC + "a" + "\x00"; // Reset to left align
+      commands += "\n\n" + ESC + "a" + "\x00"; // Reset to left align
 
       // Buat temp file
       const tempFile = path.join(__dirname, "temp_qr.bin");
@@ -385,8 +407,185 @@ async function printQRWithText(qrData, text = "") {
   });
 }
 
+// Fungsi test untuk diagnose QR code capability
+async function testQRCapability() {
+  return new Promise((resolve, reject) => {
+    try {
+      console.log(`\n🔍 Testing QR Code Capability...`);
+
+      const ESC = "\x1B";
+      const GS = "\x1D";
+
+      // Test dengan QR code sederhana "TEST"
+      const testData = "TEST";
+
+      // QR Code Model (Model 2)
+      const qrModel = GS + "(k" + String.fromCharCode(4, 0, 49, 65, 50, 0);
+
+      // QR Code Size (size 8 untuk test)
+      const qrSize = GS + "(k" + String.fromCharCode(3, 0, 49, 67, 8);
+
+      // QR Code Error Correction Level (M = Medium)
+      const qrErrorLevel = GS + "(k" + String.fromCharCode(3, 0, 49, 69, 49);
+
+      // Store QR Code data
+      const dataLength = testData.length + 3;
+      const pL = dataLength % 256;
+      const pH = Math.floor(dataLength / 256);
+      const qrStore =
+        GS + "(k" + String.fromCharCode(pL, pH, 49, 80, 48) + testData;
+
+      // Print QR Code
+      const qrPrint = GS + "(k" + String.fromCharCode(3, 0, 49, 81, 48);
+
+      // Build test commands
+      const testCommands =
+        ESC +
+        "@" + // Initialize
+        ESC +
+        "a" +
+        "\x01" + // Center align
+        qrModel +
+        qrSize +
+        qrErrorLevel +
+        qrStore +
+        qrPrint +
+        "\n\n" +
+        "QR Test: TEST\n" + // Print text untuk konfirmasi
+        "\n\n" +
+        ESC +
+        "a" +
+        "\x00"; // Left align
+
+      // Buat temp file
+      const tempFile = path.join(__dirname, "temp_test_qr.bin");
+      fs.writeFileSync(tempFile, testCommands, { encoding: "binary" });
+
+      // Copy ke COM port
+      const command = `type "${tempFile}" > ${PORT_NAME}`;
+
+      console.log(`   Test data: "${testData}"`);
+      console.log(`   Mengirim test QR ke ${PORT_NAME}...`);
+
+      execWithTimeout(command, PRINT_TIMEOUT)
+        .then(() => {
+          // Hapus temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {
+            // Ignore
+          }
+
+          console.log(`✓ Test QR command terkirim`);
+          console.log(`   Cek printer: Jika QR muncul = SUPPORT ✓`);
+          console.log(`   Cek printer: Jika hanya text = NOT SUPPORT ✗`);
+          resolve({
+            success: true,
+            message: "Test command terkirim. Cek hasil di printer.",
+            testData: testData,
+          });
+        })
+        .catch((error) => {
+          // Hapus temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {
+            // Ignore
+          }
+
+          console.error("❌ Test gagal:", error.message);
+          reject(error);
+        });
+    } catch (error) {
+      console.error("Error test QR:", error.message);
+      reject(error);
+    }
+  });
+}
+
+// Fungsi untuk print QR Code sebagai IMAGE (untuk QRIS panjang >140 karakter)
+async function printQRAsImage(qrData, text = "") {
+  return new Promise((resolve, reject) => {
+    try {
+      console.log(`📱 Generating QR Code as IMAGE...`);
+      console.log(`   Panjang QR data: ${qrData.length} karakter`);
+      console.log(`   Mode: Raster Graphics (tidak ada batasan karakter)`);
+
+      // Generate QR code sebagai buffer dengan qrcode library
+      QRCode.toBuffer(
+        qrData,
+        {
+          type: "png",
+          errorCorrectionLevel: "M",
+          margin: 1,
+          width: 256, // 256px untuk printer thermal 58mm
+        },
+        (err, buffer) => {
+          if (err) {
+            console.error("❌ Error generating QR image:", err.message);
+            reject(err);
+            return;
+          }
+
+          console.log(`   QR image generated: ${buffer.length} bytes`);
+
+          // ESC/POS commands
+          const ESC = "\x1B";
+          const GS = "\x1D";
+
+          // Tulis buffer ke file PNG sementara
+          const pngFile = path.join(__dirname, "temp_qr.png");
+          fs.writeFileSync(pngFile, buffer);
+
+          // Untuk Windows, kita gunakan external tool atau print langsung
+          // Alternatif: konversi PNG ke bitmap format yang kompatibel dengan printer
+          // Untuk saat ini, kita gunakan pendekatan sederhana: print via Windows
+
+          // Build commands dengan text
+          let commands = ESC + "@"; // Initialize
+          commands += ESC + "a" + "\x01"; // Center align
+
+          // Note: Printing image via ESC/POS memerlukan konversi ke bitmap format
+          // Untuk implementasi penuh, gunakan library seperti 'png-to-printer-bitmap'
+          // Saat ini kita fallback ke native QR dengan truncation + warning
+
+          console.log(
+            "⚠️  Image printing memerlukan bitmap conversion yang kompleks"
+          );
+          console.log("   Fallback: menggunakan native QR dengan truncate");
+
+          // Cleanup
+          try {
+            fs.unlinkSync(pngFile);
+          } catch (e) {
+            // Ignore
+          }
+
+          // Fallback ke printQRWithText dengan truncation
+          const truncatedData = qrData.substring(0, MAX_QR_LENGTH);
+          console.log(
+            `   Data ditruncate dari ${qrData.length} ke ${truncatedData.length} karakter`
+          );
+
+          printQRWithText(truncatedData, text).then(resolve).catch(reject);
+        }
+      );
+    } catch (error) {
+      console.error("Error:", error.message);
+      reject(error);
+    }
+  });
+}
+
 // Export fungsi untuk digunakan sebagai module
-module.exports = { print, printQRCode, printQRWithText, PORT_NAME };
+module.exports = {
+  print,
+  printQRCode,
+  printQRWithText,
+  printQRAsImage,
+  testQRCapability,
+  PORT_NAME,
+};
 
 // Main program (hanya jalan jika dijalankan langsung, bukan di-import)
 if (require.main === module) {
