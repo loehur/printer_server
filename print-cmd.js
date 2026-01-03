@@ -4,13 +4,32 @@ const path = require("path");
 const QRCode = require("qrcode");
 
 // ==================== KONFIGURASI ====================
-const PORT_NAME = "COM1";
-const LINE_WIDTH = 32; // Lebar baris untuk printer (32 untuk 58mm, 48 untuk 80mm)
-const PRINT_TIMEOUT = 10000; // Timeout untuk operasi print dalam milliseconds (10 detik)
-const LINE_SPACING = 34; // Line spacing dalam unit 1/180 inch (default: 30, lebih besar = lebih renggang)
-const MAX_QR_LENGTH = 300; // LIMIT HARDWARE: Maksimal 206 karakter (Size 6, Error L)
-const QR_SIZE = 6; // QR Code size 6 (1-16, semakin besar semakin besar ukurannya)
-const QR_ERROR_LEVEL = 48; // 48 = Level L (Low), 49 = M, 50 = Q, 51 = H
+// Default values (dipakai jika config.local.js tidak ada)
+const DEFAULT_CONFIG = {
+  PORT_NAME: "COM1",
+  LINE_WIDTH: 32, // Lebar baris untuk printer (32 untuk 58mm, 48 untuk 80mm)
+  PRINT_TIMEOUT: 10000, // Timeout untuk operasi print dalam milliseconds (10 detik)
+  LINE_SPACING: 34, // Line spacing dalam unit 1/180 inch (default: 30, lebih besar = lebih renggang)
+  MAX_QR_LENGTH: 300, // LIMIT HARDWARE: Maksimal karakter untuk QR Code
+  QR_SIZE: 6, // QR Code size (1-16, semakin besar semakin besar ukurannya)
+  QR_ERROR_LEVEL: 48, // 48 = Level L (Low), 49 = M, 50 = Q, 51 = H
+};
+
+// Load konfigurasi dari config.local.js jika ada, atau pakai default
+let localConfig = {};
+const configPath = path.join(__dirname, "config.local.js");
+if (fs.existsSync(configPath)) {
+  try {
+    localConfig = require("./config.local.js");
+    console.log("✓ Loaded config dari config.local.js");
+  } catch (e) {
+    console.warn("⚠️  Error loading config.local.js, menggunakan default:", e.message);
+  }
+}
+
+// Merge config (local override default)
+const config = { ...DEFAULT_CONFIG, ...localConfig };
+const { PORT_NAME, LINE_WIDTH, PRINT_TIMEOUT, LINE_SPACING, MAX_QR_LENGTH, QR_SIZE, QR_ERROR_LEVEL } = config;
 // =====================================================
 
 // Fungsi helper untuk memproses tag <td> menjadi kolom
