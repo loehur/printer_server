@@ -4,5 +4,5 @@ node_modules/
 # Konfigurasi lokal (tidak di-track)
 config.local.js
 
-# Wrapper script (local only, tidak di-track)
-START.bat
+# Bootstrapper di luar repo (distribusi terpisah)
+INSTALL.bat

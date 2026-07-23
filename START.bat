@@ -1,6 +1,16 @@
 @echo off
-cd /d %~dp0
+cd /d "%~dp0"
 
+if "%~1"=="--after-pull" goto :main
+
+echo Pulling latest updates from Git...
+git pull
+echo.
+REM Jalankan ulang dari disk supaya START.bat versi baru (setelah pull) ikut terpakai
+call "%~f0" --after-pull
+exit /b
+
+:main
 REM Cek dan buat config.local.js jika tidak ada
 if not exist "config.local.js" (
     echo config.local.js tidak ditemukan, membuat dari template...
