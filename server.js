@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const { spawn } = require("child_process");
 const {
   print,
   printQRCode,
@@ -26,6 +27,35 @@ process.on("unhandledRejection", (reason, promise) => {
 
 // Helper function untuk membersihkan HTML tags dari log
 const stripHtmlTags = (str) => str.replace(/<[^>]*>/g, "");
+
+const runPowerShell = (command, label) => {
+  console.log(`\n🔍 ${label}...\n`);
+  const ps = spawn("powershell", ["-NoProfile", "-Command", command], {
+    windowsHide: true,
+  });
+
+  let stdout = "";
+  let stderr = "";
+
+  ps.stdout.on("data", (data) => {
+    stdout += data.toString();
+  });
+
+  ps.stderr.on("data", (data) => {
+    stderr += data.toString();
+  });
+
+  ps.on("close", (code) => {
+    if (code !== 0) {
+      console.error(`❌ Perintah gagal (exit code ${code})`);
+      if (stderr) console.error(stderr.trim());
+      console.log("");
+      return;
+    }
+    if (stderr) console.error(stderr.trim());
+    console.log(stdout.trim() || "(tidak ada data)\n");
+  });
+};
 
 // Middleware CORS - Izinkan semua origin
 app.use(cors());
@@ -239,6 +269,8 @@ app.listen(PORT, async () => {
 ⌨️ Keyboard Shortcuts:
    - Tekan 't' + Enter = Test Print
    - Tekan 'q' + Enter = Test QR Print (dengan input panjang karakter)
+   - Tekan 'usb' + Enter = List printer USB
+   - Tekan 'com' + Enter = List port COM/serial
    - Tekan 'x' + Enter = Exit Server
    - Tekan 'h' + Enter = Help
 
@@ -330,6 +362,16 @@ app.listen(PORT, async () => {
           rl.resume();
         }
       })();
+    } else if (key === "usb") {
+      runPowerShell(
+        "Get-Printer | Where-Object {$_.PortName -like 'USB*'} | Format-Table Name,DriverName,PortName -AutoSize",
+        "Daftar printer USB"
+      );
+    } else if (key === "com") {
+      runPowerShell(
+        "Get-CimInstance Win32_SerialPort | Select-Object -ExpandProperty DeviceID",
+        "Daftar port COM/serial"
+      );
     } else if (key === "x" || key === "exit" || key === "quit") {
       // Exit server
       console.log("\n👋 Server shutting down...");
@@ -341,6 +383,8 @@ app.listen(PORT, async () => {
 ⌨️  Keyboard Shortcuts:
    t = Test Print (text)
    q = Test QR Print (akan tanya panjang karakter, max 300)
+   usb = List printer USB (Get-Printer)
+   com = List port COM/serial (Win32_SerialPort)
    x = Exit Server (atau ketik 'exit' / 'quit')
    h = Help (this message)
 `);
