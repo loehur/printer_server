@@ -269,7 +269,7 @@ app.listen(PORT, async () => {
 ⌨️ Keyboard Shortcuts:
    - Tekan 't' + Enter = Test Print
    - Tekan 'q' + Enter = Test QR Print (dengan input panjang karakter)
-   - Tekan 'usb' + Enter = List printer USB
+   - Tekan 'usb' + Enter = List port printer USB
    - Tekan 'com' + Enter = List port COM/serial
    - Tekan 'x' + Enter = Exit Server
    - Tekan 'h' + Enter = Help
@@ -364,8 +364,8 @@ app.listen(PORT, async () => {
       })();
     } else if (key === "usb") {
       runPowerShell(
-        "Get-Printer | Where-Object {$_.PortName -like 'USB*'} | Format-Table Name,DriverName,PortName -AutoSize",
-        "Daftar printer USB"
+        "Get-PrinterPort | Where-Object { $_.Name -like 'USB*' } | Format-Table Name, Description, PrinterHostAddress -AutoSize",
+        "Daftar port printer USB"
       );
     } else if (key === "com") {
       runPowerShell(
@@ -383,7 +383,7 @@ app.listen(PORT, async () => {
 ⌨️  Keyboard Shortcuts:
    t = Test Print (text)
    q = Test QR Print (akan tanya panjang karakter, max 300)
-   usb = List printer USB (Get-Printer)
+   usb = List port printer USB (Get-PrinterPort)
    com = List port COM/serial (Win32_SerialPort)
    x = Exit Server (atau ketik 'exit' / 'quit')
    h = Help (this message)
